@@ -20,16 +20,16 @@ class Tetris {
         this.gameRunning = false;
         this.gamePaused = false;
         
-        this.colors = [
-            '#000000', // empty
-            '#FF0000', // I
-            '#00FF00', // O
-            '#0000FF', // T
-            '#FFFF00', // S
-            '#FF00FF', // Z
-            '#00FFFF', // J
-            '#FFA500'  // L
-        ];
+        this.pieceStyles = {
+            0: { primary: '#000000', secondary: '#000000', accent: '#000000' }, // empty
+            1: { primary: '#00BFFF', secondary: '#87CEEB', accent: '#E0F6FF' }, // I - Cyan
+            2: { primary: '#FFD700', secondary: '#FFF8DC', accent: '#FFFACD' }, // O - Gold
+            3: { primary: '#9932CC', secondary: '#DA70D6', accent: '#E6E6FA' }, // T - Purple
+            4: { primary: '#32CD32', secondary: '#90EE90', accent: '#F0FFF0' }, // S - Green
+            5: { primary: '#FF4500', secondary: '#FF6347', accent: '#FFE4E1' }, // Z - Red
+            6: { primary: '#4169E1', secondary: '#6495ED', accent: '#F0F8FF' }, // J - Blue
+            7: { primary: '#FF8C00', secondary: '#FFA500', accent: '#FFF8DC' }  // L - Orange
+        };
         
         this.tetrominoes = {
             'I': [
@@ -117,6 +117,27 @@ class Tetris {
         document.getElementById('pauseButton').addEventListener('click', () => this.togglePause());
         document.getElementById('resetButton').addEventListener('click', () => this.resetGame());
         document.getElementById('restartButton').addEventListener('click', () => this.restartGame());
+        
+        // Mobile touch controls
+        document.getElementById('leftBtn').addEventListener('click', () => {
+            if (this.gameRunning && !this.gamePaused) this.movePiece(-1, 0);
+        });
+        document.getElementById('rightBtn').addEventListener('click', () => {
+            if (this.gameRunning && !this.gamePaused) this.movePiece(1, 0);
+        });
+        document.getElementById('downBtn').addEventListener('click', () => {
+            if (this.gameRunning && !this.gamePaused) this.movePiece(0, 1);
+        });
+        document.getElementById('rotateBtn').addEventListener('click', () => {
+            if (this.gameRunning && !this.gamePaused) this.rotatePiece();
+        });
+        
+        // Prevent zoom on double tap for mobile controls
+        document.querySelectorAll('.control-btn').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+            }, { passive: false });
+        });
     }
     
     handleKeyPress(e) {
@@ -124,15 +145,19 @@ class Tetris {
         
         switch(e.code) {
             case 'ArrowLeft':
+                e.preventDefault();
                 this.movePiece(-1, 0);
                 break;
             case 'ArrowRight':
+                e.preventDefault();
                 this.movePiece(1, 0);
                 break;
             case 'ArrowDown':
+                e.preventDefault();
                 this.movePiece(0, 1);
                 break;
             case 'ArrowUp':
+                e.preventDefault();
                 this.rotatePiece();
                 break;
             case 'Space':
@@ -346,12 +371,11 @@ class Tetris {
         for (let row = 0; row < this.ROWS; row++) {
             for (let col = 0; col < this.COLS; col++) {
                 if (this.board[row][col] !== 0) {
-                    this.ctx.fillStyle = this.colors[this.board[row][col]];
-                    this.ctx.fillRect(
+                    this.drawEnhancedBlock(
                         col * this.BLOCK_SIZE,
                         row * this.BLOCK_SIZE,
                         this.BLOCK_SIZE,
-                        this.BLOCK_SIZE
+                        this.board[row][col]
                     );
                 }
             }
@@ -362,16 +386,65 @@ class Tetris {
         for (let row = 0; row < this.currentPiece.shape.length; row++) {
             for (let col = 0; col < this.currentPiece.shape[row].length; col++) {
                 if (this.currentPiece.shape[row][col] !== 0) {
-                    this.ctx.fillStyle = this.colors[this.currentPiece.shape[row][col]];
-                    this.ctx.fillRect(
+                    this.drawEnhancedBlock(
                         (this.currentPiece.x + col) * this.BLOCK_SIZE,
                         (this.currentPiece.y + row) * this.BLOCK_SIZE,
                         this.BLOCK_SIZE,
-                        this.BLOCK_SIZE
+                        this.currentPiece.shape[row][col],
+                        true // isActivepiece
                     );
                 }
             }
         }
+    }
+    
+    drawEnhancedBlock(x, y, size, colorIndex, isActivePiece = false) {
+        const style = this.pieceStyles[colorIndex];
+        const ctx = this.ctx;
+        
+        // Create gradient
+        const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
+        gradient.addColorStop(0, style.accent);
+        gradient.addColorStop(0.3, style.secondary);
+        gradient.addColorStop(1, style.primary);
+        
+        // Shadow effect for active pieces
+        if (isActivePiece) {
+            ctx.shadowColor = style.primary;
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+        }
+        
+        // Main block
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, size, size);
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Highlight on top and left
+        ctx.fillStyle = style.accent;
+        ctx.fillRect(x, y, size, 2); // top
+        ctx.fillRect(x, y, 2, size); // left
+        
+        // Dark border on bottom and right
+        ctx.fillStyle = style.primary;
+        ctx.fillRect(x, y + size - 2, size, 2); // bottom
+        ctx.fillRect(x + size - 2, y, 2, size); // right
+        
+        // Inner highlight
+        ctx.fillStyle = style.secondary;
+        ctx.fillRect(x + 2, y + 2, size - 4, 1); // inner top
+        ctx.fillRect(x + 2, y + 2, 1, size - 4); // inner left
+        
+        // Outer border
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, size, size);
     }
     
     drawGrid() {
@@ -405,16 +478,45 @@ class Tetris {
         for (let row = 0; row < shape.length; row++) {
             for (let col = 0; col < shape[row].length; col++) {
                 if (shape[row][col] !== 0) {
-                    this.nextCtx.fillStyle = this.colors[shape[row][col]];
-                    this.nextCtx.fillRect(
+                    this.drawEnhancedBlockNext(
                         offsetX + col * blockSize,
                         offsetY + row * blockSize,
                         blockSize,
-                        blockSize
+                        shape[row][col]
                     );
                 }
             }
         }
+    }
+    
+    drawEnhancedBlockNext(x, y, size, colorIndex) {
+        const style = this.pieceStyles[colorIndex];
+        const ctx = this.nextCtx;
+        
+        // Create gradient
+        const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
+        gradient.addColorStop(0, style.accent);
+        gradient.addColorStop(0.3, style.secondary);
+        gradient.addColorStop(1, style.primary);
+        
+        // Main block
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, size, size);
+        
+        // Highlight on top and left
+        ctx.fillStyle = style.accent;
+        ctx.fillRect(x, y, size, 1); // top
+        ctx.fillRect(x, y, 1, size); // left
+        
+        // Dark border on bottom and right
+        ctx.fillStyle = style.primary;
+        ctx.fillRect(x, y + size - 1, size, 1); // bottom
+        ctx.fillRect(x + size - 1, y, 1, size); // right
+        
+        // Outer border
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, size, size);
     }
     
     updateDisplay() {
